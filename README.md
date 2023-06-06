@@ -76,7 +76,7 @@ allow-lan: true
 ```bash
 ./clash -d .
 ```
-##最后
+## 最后
 - 至此企业微信与chatgpt对接成功,为了节省chatgpt关联上下文消耗token数,使用过期的定长队列来缓存上下文,每个企业微信用户只关联最近6次会话历史,缓存时间60分钟
 
 - websocket_client作为测试客户端,前端作为客户端连接ws://服务地址:52712/ws即可实现类似chatgpt官网效果

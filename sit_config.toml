@@ -6,8 +6,12 @@ charset="utf-8"
 queue_max_length = 6
 queue_ttl = 3600
 
+[open_ai]
+key = ["key1","key2"]
+
 [proxy]
-url = "http://"
+host = ""
+port = ""
 
 [we_chat_work]
 token = ""

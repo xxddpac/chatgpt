@@ -1,82 +1,46 @@
-# chatgpt
+# chatGPT
 
-## 实现功能
-- 对接内部企业微信,实现自建应用会话聊天功能
+## 提供功能
 
-- 提供websocket服务,实现类似chatGPT官网页面功能
+- 企业微信自建应用与chatGPT对接实现聊天功能
+- 提供websocket服务,结合js/vue等前端框架实现类似chatGPT官网页面对话功能
+- 缓存企业微信用户关联的上下文,使用redis定长队列缓存最近6次对话历史,缓存时间一小时
 
-## 企业微信接收消息服务器配置
+## 项目说明
 
-- 申请企业微信应用(拥有应用管理的设置权限)
+- 安装redis
+- 准备chatGPT open_api_key，如果有能力可以注册多个账号,每次向chatGPT发送请求时可以随机获取一个key
+- 缓存定长的上下文为了避免过度消耗token，现在新账号注册成功好像都是5刀的额度，尽量节省token又不失上下文的缺失
+- 准备代理服务，访问chatGPT需要提供代理设置，如果部署在海外云服务器，则可忽略代理以及配置文件中proxy配置
+- 企业微信应用API接收功能设置与验证，这一步比较繁琐,稍后举一个例子说明
+- 项目根目录sit_config.toml作为配置文件，里面包含redis、proxy、企业微信、chatgpt等设置,按实际配置填写即可
 
-- 应用设置
-```bash
-开启API接收消息功能,其中token和EncodingAESKey随机获取即可,URL用来提供企业微信的请求验证,
-假设部署此项目的服务器在企业内网且IP地址为192.168.10.100,提供的验证接口为http://192.168.10.100:52712/api/v1/chat,
-将192.168.10.100以及端口52712映射到公网,最后在nginx上配置一个域名解析,域名要求企业备案,否则验证不通过,域名解析后最终得到http://xxx.xxx.com/api/v1/chat粘贴到URL中,暂时不要点击保存,接下来部署服务
-```  
+## 激活企业微信应用API接收功能
+
 ![img](docs/api.png)
-  
-- 下载项目/编辑配置文件(sit_config.toml)
+
+其中token、encodingAESKey随机获取即可,URL需要填写域名，且该域名是企业备案主体或有关联的域名，另外还需要能从公网访问到该域名，
+这里假如部署此项目的服务器在企业内网的IP是192.168.10.10，那么服务启动后提供的验证接口API是http://192.168.10.10:52712/api/v1/chat，
+接下来将192.168.10.10:52712映射到公网X.X.X.X:52712，否则企业微信无法访问到该接口(同样如果服务部署在海外云服务器，公网映射这一步也忽略)，
+最后将备案后的域名关联解析到映射后的公网X.X.X.X:52712，最终将域名https://xxx.xxx.xxx/api/v1/chat粘贴至URL,暂时不要点击保存按钮,准备服务部署
+
+## 服务部署
+
 ```bash
 git clone git@github.com:xxddpac/chatgpt.git
-```
-```bash
-[we_chat_work]中token以及EncodingAESKey对应以上随机获取的值,corpid/corpsecret从企业微信管理员获取
-  
-[redis]作为缓存企业微信发送消息的access_token以及chatgpt根据企业微信用户名关联的上下文
-  
-[proxy]作为获取代理服务器的IP端口以及chatgpt的openai_key的接口,将这部分配置抽出来为了后续方便新增或删除openai_key时服务不用重新发布
-```
-- proxy接口API返回示例(自行实现此接口)
-```json
-      {
-    "code": 200,
-    "msg": "success",
-    "data": {
-        "key": [
-            "key1",
-            "key2",
-            "key3",
-            "key4"
-        ],
-        "port": "7890",
-        "proxy": "10.10.10.10"
-    }}
-```
-- docker构建启动服务
-
-```bash
+cd chatgpt
 docker build -t chatgpt .
-docker images | grep chatgpt
 docker run -d -p 52712:52712 -v /var/log:/var/log --name 'secchatgpt' chatgpt
-docker ps -a | grep chatgpt
-```
-- 消息验证
-```bash
-点击企业微信保存按钮,此刻企业微信会立即发送验证信息,若验证失败,检查域名连通性以及服务日志
-
-docker logs secchagpt
 ```
 
-## 代理服务器配置(可自行选择适合代理,这里使用clash for linux)
-```bash
-mkdir clash
-cd clash
-wget https://github.com/Dreamacro/clash/releases/download/v1.8.0/clash-linux-amd64-v1.8.0.gz
-mv clash-linux-amd64-v1.8.0 clash
-wget -O config.yaml "替换你的服务订阅地址"?clash=1 --no-check-certificate
-chmod +x clash
-```
-编辑config.yaml将allow-lan由fasle改为true
-```bash
-allow-lan: true
-```
-下载MMDB并启动clash
-```bash
-./clash -d .
-```
-## 最后
-- 至此企业微信与chatgpt对接成功,为了节省chatgpt关联上下文消耗token数,使用过期的定长队列来缓存上下文,每个企业微信用户只关联最近6次会话历史,缓存时间60分钟
+## 请求验证
 
-- websocket_client作为测试客户端,前端作为客户端连接ws://服务地址:52712/ws即可实现类似chatgpt官网效果
+点击保存按钮，验证通过，进入应用聊天框开始chatGPT对话。
+如验证不通过，请检查域名连通性及服务日志
+```bash
+docker logs secchatgpt
+```
+
+## websocket
+
+项目根目录下websockets_client.py为测试客户端，使用js/vue作为websocket客户端连接ws://X.X.X.X:52712/ws即可

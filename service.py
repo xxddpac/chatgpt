@@ -11,6 +11,7 @@ from logs import logger
 
 wxcpt = WXBizMsgCrypt(we_chat_work_token, we_chat_work_encodingAESKey, we_chat_work_corpid)
 
+
 async def chat_verifychat_verif(request) -> str:
     msg_signature = request.query_params.get('msg_signature')
     timestamp = request.query_params.get('timestamp')
@@ -45,17 +46,6 @@ async def chat_recv_msg(msg_signature, timestamp, nonce, data):
     await send_message(from_user_name, agent_id, chat_gpt_content)
 
 
-async def get_proxy_key() -> (str, str, str):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(proxy_url) as response:
-            data = await response.json()
-            proxy = data['data']['proxy']
-            port = data['data']['port']
-            key_list = data['data']['key']
-            key = key_list[random.randint(0, len(key_list) - 1)]
-            return proxy, port, key
-
-
 async def check_proxy_port(host: str, port: str) -> bool:
     try:
         reader, writer = await asyncio.wait_for(
@@ -69,18 +59,13 @@ async def check_proxy_port(host: str, port: str) -> bool:
 
 
 async def chat_gpt_api(from_user_name, content, error=None) -> str:
-    try:
-        proxy, port, key = await get_proxy_key()
-    except (Exception,):
-        error = '【network error:】获取代理/API_KEY发生异常'
-        return error
-
-    if not await check_proxy_port(proxy, port):
-        error = '【network error:】代理网络请求不可达'
-        return error
-    os.environ['HTTP_PROXY'] = 'http://%s:%s' % (proxy, port)
-    os.environ['HTTPS_PROXY'] = 'http://%s:%s' % (proxy, port)
-    openai.api_key = key
+    if proxy_host and proxy_port:
+        if not await check_proxy_port(proxy_host, proxy_port):
+            error = '【network error:】代理网络请求不可达'
+            return error
+        os.environ['HTTP_PROXY'] = 'http://%s:%s' % (proxy_host, proxy_port)
+        os.environ['HTTPS_PROXY'] = 'http://%s:%s' % (proxy_host, proxy_port)
+    openai.api_key = open_ai_key[random.randint(0, len(open_ai_key) - 1)]
     ask = {"role": "user", "content": "%s" % content}
     await enqueue(from_user_name, json.dumps(ask, ensure_ascii=False))
     request = await dequeue(from_user_name)
